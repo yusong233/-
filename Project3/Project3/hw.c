@@ -1,6 +1,7 @@
 ﻿#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <malloc.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <memory.h>
 #include <string.h>
@@ -31,7 +32,7 @@ enum boo {
 };
 
 enum kind {
-	INT, CHAR, CONSTINT,CONSTCHAR,NONE
+	INT, CHAR, STRING, CONSTINT, CONSTCHAR, NONE, INTARR
 };
 
 char text[36][10] = {
@@ -56,10 +57,11 @@ struct word* head;
 struct word* pre;
 struct word* this;
 
-struct symobol {
+struct symbol {
 	char name[1024];
 	int type;//int,char,constInt,constChar
 	int value;
+	int layer;//层数
 };
 
 struct func {
@@ -72,10 +74,56 @@ struct func {
 /*
 	符号表，table1存储变量及常量，table2存储函数
 */
+int table1_index = 0;
+int table2_index = 0;
 
-struct symobol table1[1024];
+struct symbol* table1[1024];
 
-struct func table2[1024];
+struct func* table2[1024];
+
+//当前函数的层数
+int nowLayer = 0;
+
+//id
+char id_name[1024] = { '\0' };
+int id_type = NONE;
+int id_value = 0;
+
+//func
+char func_name[1024] = { '\0' };
+int func_type = NONE;
+int func_arrValue[20] = { 0 };
+int func_index = 0;
+
+//重置id
+void idInitial() {
+	strcpy(id_name, '\0');
+	id_type = NONE;
+	id_value = 0;
+}
+//重置func
+void funcInitial() {
+	strcpy(func_name, '\0');
+	func_type = NONE;
+	func_valueNum = 0;
+	int i;
+	for (i = 0; i < func_index; i++) {
+		func_arrValue[i] = 0;
+	}
+	func_index = 0;
+}
+
+void addID() {
+	struct symbol* iden;
+	iden = (struct symbol*)malloc(sizeof(struct symbol));
+	iden->layer = nowLayer;
+	iden->type = id_type;
+	iden->value = id_value;
+	strcpy(iden->name, id_name);
+	table1[table1_index] = iden;
+	table1_index++;
+	idInitial();
+}
 
 void error() {
 
@@ -85,10 +133,6 @@ int reFuncState();
 int state();
 int expre();
 int stateColumn();
-
-void printR(struct word* now) {
-	fprintf(fp2, "%s %s\n", name[now->type], now->string);
-}
 
 struct word* getSym() {
 	struct word* nowWord = this;
@@ -112,7 +156,6 @@ int relationOp() {
 	struct word* now = getSym();
 	int type = now->type;
 	if (type == LSS || type == LEQ || type == GRE || type == GEQ || type == NEQ || type == EQL) {
-		printR(now);
 		return TRUE;
 	}
 	else {
@@ -125,8 +168,9 @@ int relationOp() {
 int unsignedInteger() {
 	struct word* nowWord = getSym();
 	if (nowWord->type == INTCON) {
-		printR(nowWord);
-		fprintf(fp2, "<无符号整数>\n");
+		if (id_name != '\0') {
+			id_value = atoi(nowWord->string);
+		}
 		return TRUE;
 	}
 	else {
@@ -140,16 +184,16 @@ int integer() {
 	struct word* nowWord = getSym();
 	int type = nowWord->type;
 	if (type == MINU || type == PLUS) {
-		printR(nowWord);
 		if (unsignedInteger() == TRUE) {
-			fprintf(fp2, "<整数>\n");
+			if (type == MINU) {
+				id_value = -id_value;
+			}
 			return TRUE;
 		}
 	}
 	else {
 		back();
 		if (unsignedInteger() == TRUE) {
-			fprintf(fp2, "<整数>\n");
 			return TRUE;
 		}
 	}
@@ -161,12 +205,13 @@ int headState() {
 	struct word* did;
 	struct word* now = getSym();
 	if (now->type == INTTK) {
+		func_type = INT;
 		if ((did = getSym())->type == IDENFR) {
-			printR(now);
-			printR(did);
+			strcpy(func_name, did->string);
+
 			strcpy(re[index1], did->string);
 			index1++;
-			fprintf(fp2, "<声明头部>\n");
+
 			return TRUE;
 		}
 		else {
@@ -177,12 +222,13 @@ int headState() {
 		}
 	}
 	else if (now->type == CHARTK) {
+		func_type = CHAR;
 		if ((did = getSym())->type == IDENFR) {
-			printR(now);
-			printR(did);
+			strcpy(func_name, did->string);
+
 			strcpy(re[index1], did->string);
 			index1++;
-			fprintf(fp2, "<声明头部>\n");
+
 			return TRUE;
 		}
 		else {
@@ -215,56 +261,94 @@ int typeIden() {
 int varDef() {
 	struct word* did, * did1, * did2;
 	int judge = FALSE;
+	int type;
 	if (typeIden() == TRUE) {
 		did = getSym();
+		type = did->type;
 		if ((did1 = getSym())->type == IDENFR) {
+			strcpy(id_name, did1->string);
 			if ((did2 = getSym())->type == SEMICN || did2->type == COMMA || did2->type == LBRACK) {
+				switch (type) {
+					case INTTK:
+						id_type = INT;
+						break;
+					case CHARTK:
+						id_type = CHAR;
+						break;
+					default:
+				}
+				addID();
 				judge = TRUE;
-				printR(did);
-				printR(did1);
 			}
-
 			if (did2->type == LBRACK) {
-				printR(did2);
+				switch (type) {
+					case INTTK:
+						id_type = INTARR;
+						break;
+					case CHARTK:
+						id_type = STRING;
+						break;
+					default:
+				}
 				if (unsignedInteger() == TRUE) {
 					back();
-					if (strcmp((did = getSym())->string, "0") >= 0) {
+					if (atoi((did = getSym())->string) >= 0) {
 						//这个无符号整数已经输出
 						if ((did = getSym())->type == RBRACK) {
-							printR(did);
 							judge = TRUE;
+							addID();
 							while ((did = getSym())->type == COMMA) {
-								printR(did);
 								if ((did = getSym())->type == IDENFR) {
-									printR(did);
+									strcpy(id_name, did1->string);
 									if ((did = getSym())->type == LBRACK) {
-										printR(did);
+										switch (type) {
+											case INTTK:
+												id_type = INTARR;
+												break;
+											case CHARTK:
+												id_type = STRING;
+												break;
+											default:
+										}
+
 										if (unsignedInteger() == TRUE) {
 											back();
-											if (strcmp((did = getSym())->string, "0") >= 0) {
+											if (atoi((did = getSym())->string) >= 0) {
 												if ((did = getSym())->type == RBRACK) {
-													printR(did);
 													judge = TRUE;
+													addID();
 												}
 												else {
 													judge = FALSE;
-													error();
+													error();//缺少]
 													break;
 												}
 											}
 											else {
 												judge = FALSE;
-												error();
+												error();//数组长度<0
 												break;
 											}
 										}
 										else {
 											judge = FALSE;
-											error();
+											error();//[]中不是无符号整数
 											break;
 										}
 									}
-									else back();
+									else {
+										back();
+										switch (type) {
+											case INTTK:
+												id_type = INT;
+												break;
+											case CHARTK:
+												id_type = CHAR;
+												break;
+											default:
+										}
+										addID();
+									}
 								}
 								else {
 									judge = FALSE;
@@ -276,55 +360,72 @@ int varDef() {
 						}
 						else {
 							judge = FALSE;
-							error();
+							error();//缺少]
 						}
 					}
 					else {
 						judge = FALSE;
-						error();
+						error();//数组长度<0
 					}
 				}
 				else {
 					judge = FALSE;
-					error();
+					error();//[]中不是无符号整数
 				}
 			}
 			else {
 				back();
 				if (judge == TRUE) {
 					while ((did = getSym())->type == COMMA) {
-						printR(did);
 						if ((did = getSym())->type == IDENFR) {
-							printR(did);
+							strcpy(id_name, did->string);
 							judge = TRUE;
 							if ((did = getSym())->type == LBRACK) {
-								printR(did);
+								switch (type) {
+								case INTTK:
+									id_type = INTARR;
+									break;
+								case CHARTK:
+									id_type = STRING;
+									break;
+								default:
+								}
 								if (unsignedInteger() == TRUE) {
 									back();
-									if (strcmp((did = getSym())->string, "0") >= 0) {
+									if (atoi((did = getSym())->string) >= 0) {
 										if ((did = getSym())->type == RBRACK) {
-											printR(did);
+											addID();
 											judge = TRUE;
 										}
 										else {
 											judge = FALSE;
-											error();
+											error();//缺少]
 											break;
 										}
 									}
 									else {
 										judge = FALSE;
-										error();
+										error();//数组长度<0
 										break;
 									}
 								}
 								else {
 									judge = FALSE;
-									error();
+									error();//[]中不是无符号整数
 									break;
 								}
 							}
 							else {
+								switch (type) {
+								case INTTK:
+									id_type = INT;
+									break;
+								case CHARTK:
+									id_type = CHAR;
+									break;
+								default:
+								}
+								addID();
 								back();
 							}
 						}
@@ -353,7 +454,6 @@ int varDef() {
 		judge = FALSE;
 	}
 	if (judge == TRUE) {
-		fprintf(fp2, "<变量定义>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -365,12 +465,13 @@ int varSpe() {
 	int judge = FALSE;
 	while (varDef() == TRUE) {
 		if ((now = getSym())->type == SEMICN) {
-			printR(now);
 			judge = TRUE;
+		}
+		else {
+			error();//缺少;
 		}
 	}
 	if (judge == TRUE) {
-		fprintf(fp2, "<变量说明>\n");
 		return TRUE;
 	}
 	else
@@ -384,80 +485,59 @@ int conDef() {
 	int judge = TRUE;
 	struct word* now = getSym();
 	if (now->type == INTTK) {
-		printR(now);
+		id_type = CONSTINT;
 		if ((did = getSym())->type == IDENFR) {
-			printR(did);
+			strcpy(id_name, did->string);
 			if ((did = getSym())->type == ASSIGN) {
-				printR(did);
 				if (integer() == TRUE) {
+					addID();
 					while ((did = getSym())->type == COMMA) {
-						printR(did);
 						if ((did = getSym())->type == IDENFR) {
-							printR(did);
+							strcpy(id_name, did->string);
 							if ((did = getSym())->type == ASSIGN) {
-								printR(did);
 								if (integer() == TRUE) {
+									addID();
 									judge = TRUE;
 								}
-								else error();
 							}
-							else error();
 						}
-						else error();
 					}
 					back();
 					if ((did = getSym())->type == SEMICN && judge == TRUE) {
-						fprintf(fp2, "<常量定义>\n");
 						back();
 						return TRUE;
 					}
-					else error();
 				}
-				else error();
 			}
-			else error();
 		}
-		else error();
 	}
 	else if (now->type == CHARTK) {
-		printR(now);
+		id_type = CONSTCHAR;
 		if ((did = getSym())->type == IDENFR) {
-			printR(did);
+			strcpy(id_name, did->string);
 			if ((did = getSym())->type == ASSIGN) {
-				printR(did);
 				if ((did = getSym())->type == CHARCON) {
-					printR(did);
+					addID();
 					while ((did = getSym())->type == COMMA) {
-						printR(did);
 						if ((did = getSym())->type == IDENFR) {
-							printR(did);
+							strcpy(id_name, did->string);
 							if ((did = getSym())->type == ASSIGN) {
-								printR(did);
 								if ((did = getSym())->type == CHARCON) {
-									printR(did);
+									addID();
 									judge = TRUE;
 								}
-								else error();
 							}
-							else error();
 						}
-						else error();
 					}
 					back();
 					if ((did = getSym())->type == SEMICN && judge == TRUE) {
-						fprintf(fp2, "<常量定义>\n");
 						back();
 						return TRUE;
 					}
-					else error();
 				}
-				else error();
 			}
-			else error();
 		}
-		else error();
 	}
-	else error();
 	return FALSE;
 }
 
@@ -466,13 +546,11 @@ int conSpe() {
 	struct word* now;
 	int judge = FALSE;
 	while ((now = getSym())->type == CONSTTK) {
-		printR(now);
 		if (conDef() == TRUE) {
 			if ((now = getSym())->type == SEMICN) {
-				printR(now);
 				judge = TRUE;
 			}
-			else {
+			else {//缺少分号；
 				judge = FALSE;
 				error();
 			}
@@ -484,12 +562,10 @@ int conSpe() {
 	}
 	back();
 	if (judge == TRUE) {
-		fprintf(fp2, "<常量说明>\n");
 		return TRUE;
 	}
 	else
 		return FALSE;
-
 }
 
 //<因子>
@@ -500,12 +576,9 @@ int factor() {
 	if (now->type == IDENFR) {
 
 		if ((did = getSym())->type == LBRACK) {
-			printR(now);
-			printR(did);
 
 			if (expre() == TRUE) {
 				if ((did = getSym())->type == RBRACK) {
-					printR(did);
 					judge = TRUE;
 				}
 				else judge = FALSE;
@@ -523,16 +596,13 @@ int factor() {
 			else {
 				back();
 				back();
-				printR(getSym());
 				judge = TRUE;
 			}
 		}
 	}
 	else if (now->type == LPARENT) {
-		printR(now);
 		if (expre() == TRUE) {
 			if ((did = getSym())->type == RPARENT) {
-				printR(did);
 				judge = TRUE;
 			}
 			else judge = FALSE;
@@ -545,7 +615,6 @@ int factor() {
 			judge = TRUE;
 		}
 		else if ((now = getSym())->type == CHARCON) {
-			printR(now);
 			judge = TRUE;
 		}
 		else {
@@ -554,7 +623,6 @@ int factor() {
 		}
 	}
 	if (judge == TRUE) {
-		fprintf(fp2, "<因子>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -567,7 +635,6 @@ int item() {
 	if (factor() == TRUE) {
 		judge = TRUE;
 		while ((did = getSym())->type == MULT || did->type == DIV) {
-			printR(did);
 			if (factor() == TRUE) {
 				judge = TRUE;
 			}
@@ -575,7 +642,6 @@ int item() {
 		back();
 	}
 	if (judge == TRUE) {
-		fprintf(fp2, "<项>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -586,7 +652,6 @@ int expre() {
 	struct word* now = getSym();
 	int judge = FALSE;
 	if (now->type == PLUS || now->type == MINU) {
-		printR(now);
 		judge = FALSE;
 	}
 	else back();
@@ -594,7 +659,6 @@ int expre() {
 	if (item() == TRUE) {
 		judge = TRUE;
 		while ((now = getSym())->type == PLUS || now->type == MINU) {
-			printR(now);
 			judge = FALSE;
 			if (item() == TRUE) {
 				judge = TRUE;
@@ -604,7 +668,6 @@ int expre() {
 		back();
 	}
 	if (judge == TRUE) {
-		fprintf(fp2, "<表达式>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -615,23 +678,16 @@ int readState() {
 	struct word* now, * did;
 	int flag = TRUE;
 	if ((now = getSym())->type == SCANFTK) {
-		printR(now);
 		if ((did = getSym())->type == LPARENT) {
-			printR(did);
 			if ((did = getSym())->type == IDENFR) {
-				printR(did);
 				while ((did = getSym())->type == COMMA) {
-					printR(did);
 					if ((did = getSym())->type == IDENFR) {
-						printR(did);
 						flag = TRUE;
 					}
 					else flag = FALSE;
 				}
 				back();
 				if ((did = getSym())->type == RPARENT && flag == TRUE) {
-					printR(did);
-					fprintf(fp2, "<读语句>\n");
 					return TRUE;
 				}
 			}
@@ -646,23 +702,16 @@ int writeState() {
 	struct word* now, * did;
 	int flag = FALSE;
 	if ((now = getSym())->type == PRINTFTK) {
-		printR(now);
 		if ((did = getSym())->type == LPARENT) {
-			printR(did);
 			if ((did = getSym())->type == STRCON) {
-				printR(did);
-				fprintf(fp2, "<字符串>\n");
 				if ((did = getSym())->type == COMMA) {
-					printR(did);
 					if (expre() == TRUE) {
 						if ((did = getSym())->type == RPARENT) {
-							printR(did);
 							flag = TRUE;
 						}
 					}
 				}
 				else if (did->type == RPARENT) {
-					printR(did);
 					flag = TRUE;
 				}
 			}
@@ -670,7 +719,6 @@ int writeState() {
 				back();
 				if (expre() == TRUE) {
 					if ((did = getSym())->type == RPARENT) {
-						printR(did);
 						flag = TRUE;
 					}
 				}
@@ -681,7 +729,6 @@ int writeState() {
 	else back();
 
 	if (flag == TRUE) {
-		fprintf(fp2, "<写语句>\n");
 		return TRUE;
 	}
 	return FALSE;
@@ -693,14 +740,11 @@ int returnState() {
 	struct word* now, * did;
 	if ((now = getSym())->type == RETURNTK) {
 		flag = TRUE;
-		printR(now);
 		if ((did = getSym())->type == LPARENT) {
 			flag = FALSE;
-			printR(did);
 			if (expre() == TRUE) {
 				if ((did = getSym())->type == RPARENT) {
 					flag = TRUE;
-					printR(did);
 				}
 			}
 		}
@@ -709,7 +753,6 @@ int returnState() {
 	else back();
 
 	if (flag == TRUE) {
-		fprintf(fp2, "<返回语句>\n");
 		return TRUE;
 	}
 	return FALSE;
@@ -721,20 +764,15 @@ int assignState() {
 	struct word* did;
 	int flag = FALSE;
 	if (now->type == IDENFR) {
-		printR(now);
 		if ((did = getSym())->type == ASSIGN) {
-			printR(did);
 			if (expre() == TRUE) {
 				flag = TRUE;
 			}
 		}
 		else if (did->type == LBRACK) {
-			printR(did);
 			if (expre() == TRUE) {
 				if ((did = getSym())->type == RBRACK) {
-					printR(did);
 					if ((did = getSym())->type == ASSIGN) {
-						printR(did);
 						if (expre() == TRUE) {
 							flag = TRUE;
 						}
@@ -746,7 +784,6 @@ int assignState() {
 	}
 	else back();
 	if (flag == TRUE) {
-		fprintf(fp2, "<赋值语句>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -758,7 +795,6 @@ int condition() {
 	if (expre() == TRUE) {
 		if (relationOp() == TRUE) {
 			if (expre() == TRUE) {
-				fprintf(fp2, "<条件>\n");
 				return TRUE;
 			}
 			else {
@@ -766,7 +802,6 @@ int condition() {
 			}
 		}
 		else {
-			fprintf(fp2, "<条件>\n");
 			return TRUE;
 		}
 	}
@@ -779,15 +814,11 @@ int conditionState() {
 	struct word* did;
 	int flag = FALSE;
 	if (now->type == IFTK) {
-		printR(now);
 		if ((did = getSym())->type == LPARENT) {
-			printR(did);
 			if (condition() == TRUE) {
 				if ((did = getSym())->type == RPARENT) {
-					printR(did);
 					if (state() == TRUE) {
 						if ((did = getSym())->type == ELSETK) {
-							printR(did);
 							if (state() == TRUE) {
 								flag = TRUE;
 							}
@@ -811,7 +842,6 @@ int conditionState() {
 	}
 	else back();
 	if (flag == TRUE) {
-		fprintf(fp2, "<条件语句>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -820,7 +850,6 @@ int conditionState() {
 //<步长>
 int step() {
 	if (unsignedInteger() == TRUE) {
-		fprintf(fp2, "<步长>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -832,12 +861,9 @@ int loopState() {
 	struct word* did;
 	int flag = FALSE;
 	if (now->type == WHILETK) {
-		printR(now);
 		if ((did = getSym())->type == LPARENT) {
-			printR(did);
 			if (condition() == TRUE) {
 				if ((did = getSym())->type == RPARENT) {
-					printR(did);
 					if (state() == TRUE) {
 						flag = TRUE;
 					}
@@ -846,15 +872,11 @@ int loopState() {
 		}
 	}
 	else if (now->type == DOTK) {
-		printR(now);
 		if (state() == TRUE) {
 			if ((did = getSym())->type == WHILETK) {
-				printR(did);
 				if ((did = getSym())->type == LPARENT) {
-					printR(did);
 					if (condition() == TRUE) {
 						if ((did = getSym())->type == RPARENT) {
-							printR(did);
 							flag = TRUE;
 						}
 					}
@@ -863,30 +885,19 @@ int loopState() {
 		}
 	}
 	else if (now->type == FORTK) {
-		printR(now);
 		if ((did = getSym())->type == LPARENT) {
-			printR(did);
 			if ((did = getSym())->type == IDENFR) {
-				printR(did);
 				if ((did = getSym())->type == ASSIGN) {
-					printR(did);
 					if (expre() == TRUE) {
 						if ((did = getSym())->type == SEMICN) {
-							printR(did);
 							if (condition() == TRUE) {
 								if ((did = getSym())->type == SEMICN) {
-									printR(did);
 									if ((did = getSym())->type == IDENFR) {
-										printR(did);
 										if ((did = getSym())->type == ASSIGN) {
-											printR(did);
 											if ((did = getSym())->type == IDENFR) {
-												printR(did);
 												if ((did = getSym())->type == PLUS || did->type == MINU) {
-													printR(did);
 													if (step() == TRUE) {
 														if ((did = getSym())->type == RPARENT) {
-															printR(did);
 															if (state() == TRUE) {
 																flag = TRUE;
 															}
@@ -907,7 +918,6 @@ int loopState() {
 	else back();
 
 	if (flag == TRUE) {
-		fprintf(fp2, "<循环语句>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -920,7 +930,6 @@ int valueParaTable() {
 	if (expre() == TRUE) {
 		flag = TRUE;
 		while ((did1 = getSym())->type == COMMA) {
-			printR(did1);
 			flag = FALSE;
 			if (expre() == TRUE) {
 				flag = TRUE;
@@ -932,7 +941,6 @@ int valueParaTable() {
 		flag = TRUE;
 	}
 	if (flag == TRUE) {
-		fprintf(fp2, "<值参数表>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -952,12 +960,8 @@ int reFuncState() {
 		}
 		if (judge == TRUE) {
 			if ((did2 = getSym())->type == LPARENT) {
-				printR(did1);
-				printR(did2);
 				if (valueParaTable() == TRUE) {
 					if ((did3 = getSym())->type == RPARENT) {
-						printR(did3);
-						fprintf(fp2, "<有返回值函数调用语句>\n");
 						return TRUE;
 					}
 				}
@@ -987,12 +991,8 @@ int nonFuncState() {
 		}
 		if (judge == TRUE) {
 			if ((did2 = getSym())->type == LPARENT) {
-				printR(did1);
-				printR(did2);
 				if (valueParaTable() == TRUE) {
 					if ((did3 = getSym())->type == RPARENT) {
-						printR(did3);
-						fprintf(fp2, "<无返回值函数调用语句>\n");
 						return TRUE;
 					}
 				}
@@ -1021,10 +1021,8 @@ int state() {
 		judge = TRUE;
 	}
 	else if ((now = getSym())->type == LBRACE) {
-		printR(now);
 		if (stateColumn() == TRUE) {
 			if ((did = getSym())->type == RBRACE) {
-				printR(did);
 				judge = TRUE;
 			}
 		}
@@ -1033,18 +1031,15 @@ int state() {
 		back();//回退上一个getSym
 		if (reFuncState() == TRUE || nonFuncState() == TRUE || assignState() == TRUE) {
 			if ((now = getSym())->type == SEMICN) {
-				printR(now);
 				judge = TRUE;
 			}
 		}
 		else if (readState() == TRUE || writeState() == TRUE || returnState() == TRUE) {
 			if ((now = getSym())->type == SEMICN) {
-				printR(now);
 				judge = TRUE;
 			}
 		}
 		else if ((now = getSym())->type == SEMICN) {
-			printR(now);
 			judge = TRUE;
 		}
 		else {
@@ -1054,7 +1049,6 @@ int state() {
 	}
 
 	if (judge == TRUE) {
-		fprintf(fp2, "<语句>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -1063,7 +1057,6 @@ int state() {
 //<语句列>
 int stateColumn() {
 	while (state() == TRUE);
-	fprintf(fp2, "<语句列>\n");
 	return TRUE;
 }
 
@@ -1072,7 +1065,6 @@ int comState() {
 	conSpe();//常量说明
 	varSpe();//变量说明
 	if (stateColumn() == TRUE) {
-		fprintf(fp2, "<复合语句>\n");
 		return TRUE;
 	}
 	return FALSE;
@@ -1082,17 +1074,42 @@ int comState() {
 int paraTable() {
 	struct word* did;
 	int judge = FALSE;
+	int type;
 	if (typeIden() == TRUE) {
-		printR(getSym());//输出类型标识符
+		type = getSym()->type;
+		switch (type)
+		{
+		case INTTK:
+			func_arrValue[func_index] = INT;
+			func_index++;
+			break;
+		case CHARTK:
+			func_arrValue[func_index] = CHAR;
+			func_index++;
+			break;
+		default:
+			break;
+		}
 		if ((did = getSym())->type == IDENFR) {
-			printR(did);
 			judge = TRUE;
 			while ((did = getSym())->type == COMMA) {
-				printR(did);
 				if (typeIden() == TRUE) {
-					printR(getSym());//输出类型标识符
+					type = getSym()->type;
+					switch (type)
+					{
+					case INTTK:
+						func_arrValue[func_index] = INT;
+						func_index++;
+						break;
+					case CHARTK:
+						func_arrValue[func_index] = CHAR;
+						func_index++;
+						break;
+					default:
+						break;
+					}
+
 					if ((did = getSym())->type == IDENFR) {
-						printR(did);
 						judge = TRUE;
 					}
 					else {
@@ -1117,7 +1134,6 @@ int paraTable() {
 	else judge = TRUE;//参数表为<空>
 
 	if (judge == TRUE) {
-		fprintf(fp2, "<参数表>\n");
 		return TRUE;
 	}
 	else return FALSE;
@@ -1128,29 +1144,35 @@ int reFunc() {
 	struct word* did;
 	if (headState() == TRUE) {
 		if ((did = getSym())->type == LPARENT) {
-			printR(did);
 			if (paraTable() == TRUE) {
+				/* addFunction() */
+				struct func* function;
+				function = (struct func*)malloc(sizeof(struct func));
+				strcpy(function->name, func_name);
+				function->type = func_type;
+				function->valueNum = func_index + 1;
+				memcpy(function->arrValue, func_arrValue, sizeof(func_arrValue));
+				table2[table2_index] = function;
+				table2_index++;
+				funcInitial();
+
 				if ((did = getSym())->type == RPARENT) {
-					printR(did);
 					if ((did = getSym())->type == LBRACE) {
-						printR(did);
 						if (comState() == TRUE) {
 							if ((did = getSym())->type == RBRACE) {
-								printR(did);
-								fprintf(fp2, "<有返回值函数定义>\n");
 								return TRUE;
 							}
-							else error();
+							else error();//缺少}
 						}
 						else error();
 					}
-					else error();
+					else error();//缺少{
 				}
-				else error();
+				else error();//缺少)
 			}
 			else error();
 		}
-		else error();
+		else error();//缺少(
 	}
 	return FALSE;
 }
@@ -1160,22 +1182,16 @@ int nonFunc() {
 	struct word* did;
 	struct word* now = getSym();
 	if (now->type == VOIDTK) {
+		
 		if ((did = getSym())->type == IDENFR) {
-			printR(now);
-			printR(did);
 			strcpy(non[index2], did->string);
 			index2++;
 			if ((did = getSym())->type == LPARENT) {
-				printR(did);
 				if (paraTable() == TRUE) {
 					if ((did = getSym())->type == RPARENT) {
-						printR(did);
 						if ((did = getSym())->type == LBRACE) {
-							printR(did);
 							if (comState() == TRUE) {
 								if ((did = getSym())->type == RBRACE) {
-									printR(did);
-									fprintf(fp2, "<无返回值函数定义>\n");
 									return TRUE;
 								}
 								else error();
@@ -1205,18 +1221,11 @@ int mainFunc() {
 	struct word* nowWord = getSym();
 	if (nowWord->type == VOIDTK) {
 		if ((did = getSym())->type == MAINTK) {
-			printR(nowWord);
-			printR(did);
 			if ((did = getSym())->type == LPARENT) {
-				printR(did);
 				if ((did = getSym())->type == RPARENT) {
-					printR(did);
 					if ((did = getSym())->type == LBRACE) {
-						printR(did);
 						if (comState() == TRUE) {
 							if ((did = getSym())->type == RBRACE) {
-								printR(did);
-								fprintf(fp2, "<主函数>\n");
 								return TRUE;
 							}
 							else error();//缺少}
@@ -1249,7 +1258,6 @@ void program() {
 		flag = TRUE;
 	}
 	if (flag == TRUE) {
-		fprintf(fp2, "<程序>\n");
 	}
 }
 
@@ -1282,8 +1290,6 @@ void addType2(int type, char* str) {
 		if ((c >= 47 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 42 || c == 43 || c == 45 || c == 95) {
 
 		}
-		else
-			fprintf(fp2, "%d a\n", one->colNum);
 	}
 
 	one->before = pre;
@@ -1530,16 +1536,6 @@ void readWord() {
 	pre->next = NULL;
 	head = head->next;
 	head->before = NULL;
-}
-
-void print() {
-	struct word* now;
-	now = head;
-	while (now != NULL) {
-		printf("%s %s colNum : %d\n", name[now->type], now->string, now->colNum);
-		now = now->next;
-	}
-
 }
 
 int main() {
