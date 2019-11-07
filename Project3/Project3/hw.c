@@ -97,20 +97,16 @@ int func_index = 0;
 
 //重置id
 void idInitial() {
-	strcpy(id_name, '\0');
+	memset(id_name,'\0',sizeof(id_name));
 	id_type = NONE;
 	id_value = 0;
 }
 //重置func
 void funcInitial() {
-	strcpy(func_name, '\0');
+	memset(func_name, '\0', sizeof(id_name));
 	func_type = NONE;
-	func_valueNum = 0;
-	int i;
-	for (i = 0; i < func_index; i++) {
-		func_arrValue[i] = 0;
-	}
 	func_index = 0;
+	memset(func_arrValue, 0, sizeof(func_arrValue));
 }
 
 void addID() {
@@ -276,6 +272,7 @@ int varDef() {
 						id_type = CHAR;
 						break;
 					default:
+						break;
 				}
 				addID();
 				judge = TRUE;
@@ -289,6 +286,7 @@ int varDef() {
 						id_type = STRING;
 						break;
 					default:
+						break;
 				}
 				if (unsignedInteger() == TRUE) {
 					back();
@@ -309,6 +307,7 @@ int varDef() {
 												id_type = STRING;
 												break;
 											default:
+												break;
 										}
 
 										if (unsignedInteger() == TRUE) {
@@ -346,6 +345,7 @@ int varDef() {
 												id_type = CHAR;
 												break;
 											default:
+												break;
 										}
 										addID();
 									}
@@ -389,6 +389,7 @@ int varDef() {
 									id_type = STRING;
 									break;
 								default:
+									break;
 								}
 								if (unsignedInteger() == TRUE) {
 									back();
@@ -424,6 +425,7 @@ int varDef() {
 									id_type = CHAR;
 									break;
 								default:
+									break;
 								}
 								addID();
 								back();
@@ -1182,29 +1184,41 @@ int nonFunc() {
 	struct word* did;
 	struct word* now = getSym();
 	if (now->type == VOIDTK) {
-		
+		func_type = NONE;
 		if ((did = getSym())->type == IDENFR) {
+			strcpy(func_name, did->string);
 			strcpy(non[index2], did->string);
 			index2++;
 			if ((did = getSym())->type == LPARENT) {
 				if (paraTable() == TRUE) {
+					/* addFunction() */
+					struct func* function;
+					function = (struct func*)malloc(sizeof(struct func));
+					strcpy(function->name, func_name);
+					function->type = func_type;
+					function->valueNum = func_index + 1;
+					memcpy(function->arrValue, func_arrValue, sizeof(func_arrValue));
+					table2[table2_index] = function;
+					table2_index++;
+					funcInitial();
+
 					if ((did = getSym())->type == RPARENT) {
 						if ((did = getSym())->type == LBRACE) {
 							if (comState() == TRUE) {
 								if ((did = getSym())->type == RBRACE) {
 									return TRUE;
 								}
-								else error();
+								else error();//缺少}
 							}
 							else error();
 						}
-						else error();
+						else error();//缺少{
 					}
-					else error();
+					else error();//缺少）
 				}
 				else error();
 			}
-			else error();
+			else error();//缺少（
 		}
 		else {
 			back();
@@ -1549,9 +1563,7 @@ int main() {
 	initialLink();
 	readWord();
 
-	print();
-
-	//program();
+	program();
 
 	fclose(fp1);
 	fclose(fp2);
