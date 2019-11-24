@@ -5,118 +5,14 @@
 #include <ctype.h>
 #include <memory.h>
 #include <string.h>
-
-FILE* fp1;
-FILE* fp2;
-
-int index1 = 0;
-
-int index2 = 0;
-
-int numCol = 1;//读入文件的行号
-
-enum type {
-	IDENFR = 0, INTCON, CHARCON, STRCON, CONSTTK, INTTK, CHARTK, VOIDTK, MAINTK,
-	IFTK, ELSETK, DOTK, WHILETK, FORTK, SCANFTK, PRINTFTK, RETURNTK, PLUS,
-	MINU, MULT, DIV, LSS, LEQ, GRE, GEQ, EQL, NEQ, ASSIGN, SEMICN, COMMA, LPARENT,
-	RPARENT, LBRACK, RBRACK, LBRACE, RBRACE
-}nowType;
-
-enum boo {
-	FALSE = 0, TRUE
-};
-
-enum kind {
-	INT, CHAR, CONSTINT, CONSTCHAR, NONE, INTARR, CHARARR
-};
-
-enum chararacter {
-	a = 0, b, c, d, e, f, g, h, ii, j, k, l, m, n, o
-};
-
-char charact[15] = { 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o' };
-
-char text[36][10] = {
-	{""},{""},{""},{""},{"const"},{"int"},{"char"},{"void"},{"main"},{"if"},{"else"},{"do"},{"while"},{"for"},{"scanf"},{"printf"},{"return"},{"+"},{"-"},{"*"},{"/"},{"<"},{"<="},{">"},{">="},{"=="},{"!="},{"="},{";"},{","},{"("},{")"},{"["},{"]"},{"{"},{"}"}
-};
-
-char name[36][10] = {
-	{"IDENFR"}, {"INTCON"}, {"CHARCON"}, {"STRCON"}, {"CONSTTK"}, {"INTTK"}, {"CHARTK"}, {"VOIDTK"}, {"MAINTK"},
-{"IFTK"}, {"ELSETK"}, {"DOTK"}, {"WHILETK"}, {"FORTK"}, {"SCANFTK"}, {"PRINTFTK"}, {"RETURNTK"}, {"PLUS"},
-{"MINU"}, {"MULT"}, {"DIV"}, {"LSS"}, {"LEQ"}, {"GRE"}, {"GEQ"}, {"EQL"}, {"NEQ"}, {"ASSIGN"}, {"SEMICN"}, {"COMMA"},{"LPARENT"},{"RPARENT"}, {"LBRACK"}, {"RBRACK"}, {"LBRACE"}, {"RBRACE"}
-};
-
-
-
-struct word {
-	int type;
-	char string[1024];
-	int colNum;
-	struct word* next;
-	struct word* before;
-};
-
-struct word* head;
-struct word* pre;
-struct word* this;
-
-struct symbol {
-	char name[1024];
-	int type;//int,char,constInt,constChar
-	int value;
-	int layer;//层数
-};
-
-struct func {
-	char name[1024];
-	int type;//返回值类型，int,char,none
-	int valueNum;//参数个数
-	int arrValue[20];//参数类型
-};
-
-void back();
-void error(struct word* now, int index);
-
-//这两个在program初始化
-struct symbol* nowSymbol;
-struct func* nowFunc;
-int nowFunc_index = 0;
-int func_test = FALSE;
-
-/*
-	符号表，table1存储变量及常量，table2存储函数
-*/
-int table1_index = 0;
-int table2_index = 0;
-
-struct symbol* table1[1024];
-
-struct func* table2[1024];
-
-//当前函数的层数
-int nowLayer = 0;
-
-//id
-char id_name[1024] = { '\0' };
-int id_type = NONE;
-int id_value = 0;
-
-//func
-char func_name[1024] = { '\0' };
-int func_type = NONE;
-int func_arrValue[20] = { 0 };
-int func_index = -1;
-int func_return = FALSE;
-
-//exper
-int nowExpre = NONE;
-int nowItem = NONE;
-int nowFactor = NONE;
+#include "useType.h"
 
 //重置id
 void idInitial() {
 	memset(id_name, '\0', sizeof(id_name));
 	id_type = NONE;
+	id_kind = NONE;
+	id_size = 1;
 	id_value = 0;
 }
 //重置func
@@ -126,96 +22,112 @@ void funcInitial() {
 	func_index = -1;
 	memset(func_arrValue, 0, sizeof(func_arrValue));
 	func_return = FALSE;
+	id_before = NULL;
 }
 
 void addID() {
+
 	struct symbol* iden;
 	iden = (struct symbol*)malloc(sizeof(struct symbol));
-	iden->layer = nowLayer;
+	iden->before = NULL;
+	iden->next = NULL;
 	iden->type = id_type;
+	iden->kind = id_kind;
 	iden->value = id_value;
 	strcpy(iden->name, id_name);
-	table1[table1_index] = iden;
-	table1_index++;
+
+
+	if (id_before == NULL) {
+		funcTable[funcTable_index]->begin = iden;
+	}
+	else {
+		id_before->next = iden;
+	}
+	iden->before = id_before;
+	id_before = iden;
 	idInitial();
 }
 
 int checkRedefinition(struct word* now) { // 检查标识符重定义,TRUE为没有重定义，FALSE为重定义
 	int judge = TRUE;
-	int i;
-	for (i = 0; i < table1_index; i++) {
-		if (strcmp(table1[i]->name, id_name) == 0) {
-			error(now, b);//名字重定义
-			idInitial();
-			judge = FALSE;
-			break;
+	struct symbol* p;
+	if (funcTable_index > 0) {
+		p = funcTable[funcTable_index]->begin;
+		while (p != NULL) {
+			if (strcmp(p->name, id_name) == 0) {
+				error(now, b);//名字重定义
+				idInitial();
+				return FALSE;
+			}
+			p = p->next;
 		}
 	}
+
+	p = funcTable[0]->begin;
+	while (p != NULL) {
+		if (strcmp(p->name, id_name) == 0) {
+			error(now, b);//名字重定义
+			idInitial();
+			return FALSE;
+		}
+		p = p->next;
+	}
+
 	return judge;
 }
 
 int checkRedefinition2(struct word* now) { //检查函数重定义，TRUE为没有重定义，FALSE为重定义
 	int judge = TRUE;
 	int i;
-	for (i = 0; i < table2_index; i++) {
-		if (strcmp(table2[i]->name, func_name) == 0) {
+	for (i = funcTable_index; i >= 0; i--) {
+		if (strcmp(funcTable[i]->name, func_name) == 0) {
 			error(now, b);//名字重定义
 			idInitial();
-			judge = FALSE;
-			break;
+			return FALSE;
 		}
 	}
 	return judge;
 }
 
-int checkUndefined(struct word* now) {//检查名字未定义，返回-1为未定义，返回值>=0为已定义的数组下标
+struct symbol* checkUndefined(struct word* now) {//检查名字未定义，返回NULL为未定义，返回值为对应的symbol
+	int judge = FALSE;
+	struct symbol* p;
+	if (funcTable_index > 0) {
+		p = funcTable[funcTable_index]->begin;
+		while (p != NULL) {
+			if (strcmp(p->name, now->string) == 0) {
+				return p;
+			}
+			p = p->next;
+		}
+	}
+
+	p = funcTable[0]->begin;
+	while (p != NULL) {
+		if (strcmp(p->name, now->string) == 0) {
+			return p;
+		}
+		p = p->next;
+	}
+	if (judge == FALSE) {
+		error(now, c);//名字未定义
+		return NULL;
+	}
+}
+
+struct func* checkUndefined2(struct word* now) {//检查函数未定义，返回NULL为未定义，否则返回已定义函数
 	int i;
 	int judge = FALSE;
-	for (i = 0; i < table1_index; i++) {
-		if (strcmp(now->string, table1[i]->name) == 0) {
-			judge = TRUE;
-			break;
+	for (i = funcTable_index; i >= 0; i--) {
+		if (strcmp(funcTable[i]->name, now->string) == 0) {
+			return funcTable[i];
 		}
 	}
 	if (judge == FALSE) {
 		error(now, c);//名字未定义
-		return -1;
-	}
-	else {
-		return i;
+		return NULL;
 	}
 }
-
-int checkUndefined2(struct word* now) {//检查函数未定义，返回-1为未定义，返回值>=0为已定义函数的数组下标
-	int i;
-	int judge = FALSE;
-	for (i = 0; i < table2_index; i++) {
-		if (strcmp(now->string, table2[i]->name) == 0) {
-			judge = TRUE;
-			break;
-		}
-	}
-	if (judge == FALSE) {
-		error(now, c);//名字未定义
-		return -1;
-	}
-	else {
-		return i;
-	}
-}
-
-void nowFuncInitial() {
-	memset(nowFunc->name, '\0', sizeof(nowFunc->name));
-	nowFunc->type = NONE;
-	nowFunc->valueNum = 0;
-	memset(nowFunc->arrValue, 0, sizeof(nowFunc->arrValue));
-	nowFunc_index = 0;
-}
-
-int reFuncState();
-int state();
-int expre();
-int stateColumn();
 
 struct word* getSym() {
 	struct word* nowWord = this;
@@ -350,9 +262,11 @@ int varDef() {
 	if (typeIden() == TRUE) {
 		did = getSym();
 		type = did->type;
+
 		if ((did1 = getSym())->type == IDENFR) {
 			strcpy(id_name, did1->string);
-			if ((did2 = getSym())->type == SEMICN || did2->type == COMMA ) {
+			id_kind = VAR;
+			if ((did2 = getSym())->type == SEMICN || did2->type == COMMA) {//int/char v1
 				switch (type) {
 				case INTTK:
 					id_type = INT;
@@ -369,20 +283,20 @@ int varDef() {
 				else idInitial();
 				judge = TRUE;
 			}
-			if (did2->type == LBRACK) {
+			if (did2->type == LBRACK) {// int/char v1[length]
 				switch (type) {
 				case INTTK:
-					id_type = INTARR;
+					id_type = ARRAY;
 					break;
 				case CHARTK:
-					id_type = CHARARR;
+					id_type = STRING;
 					break;
 				default:
 					break;
 				}
 				if (unsignedInteger() == TRUE) {
 					back();
-					if (atoi((did = getSym())->string) >= 0) {
+					if ((id_size = atoi((did = getSym())->string)) >= 0) {
 						//这个无符号整数已经输出
 						if (checkRedefinition(did1) == TRUE) {
 							addID();
@@ -392,14 +306,15 @@ int varDef() {
 							judge = TRUE;
 							while ((did = getSym())->type == COMMA) {
 								if ((did1 = getSym())->type == IDENFR) {
+									id_kind = VAR;
 									strcpy(id_name, did1->string);
 									if ((did = getSym())->type == LBRACK) {
 										switch (type) {
 										case INTTK:
-											id_type = INTARR;
+											id_type = ARRAY;
 											break;
 										case CHARTK:
-											id_type = CHARARR;
+											id_type = STRING;
 											break;
 										default:
 											break;
@@ -407,7 +322,7 @@ int varDef() {
 
 										if (unsignedInteger() == TRUE) {
 											back();
-											if (atoi((did = getSym())->string) >= 0) {
+											if ((id_size = atoi((did = getSym())->string)) >= 0) {
 												if (checkRedefinition(did1) == TRUE) {
 													addID();
 												}
@@ -476,22 +391,23 @@ int varDef() {
 				if (judge == TRUE) {
 					while ((did = getSym())->type == COMMA) {
 						if ((did = getSym())->type == IDENFR) {
+							id_kind = VAR;
 							strcpy(id_name, did->string);
 							judge = TRUE;
 							if ((did = getSym())->type == LBRACK) {
 								switch (type) {
 								case INTTK:
-									id_type = INTARR;
+									id_type = ARRAY;
 									break;
 								case CHARTK:
-									id_type = CHARARR;
+									id_type = STRING;
 									break;
 								default:
 									break;
 								}
 								if (unsignedInteger() == TRUE) {
 									back();
-									if (atoi((did = getSym())->string) >= 0) {
+									if ((id_size = atoi((did = getSym())->string)) >= 0) {
 										if ((did = getSym())->type == RBRACK) {
 											addID();
 											judge = TRUE;
@@ -583,18 +499,20 @@ int conDef() {
 	struct word* did, * did1;
 	int judge = TRUE;
 	struct word* now = getSym();
-	if (now->type == INTTK) {
-		id_type = CONSTINT;
-		if ((did1 = getSym())->type == IDENFR) {
-			strcpy(id_name, did1->string);
-			if ((did = getSym())->type == ASSIGN) {
-				if (integer() == TRUE) {
+	if (now->type == INTTK) {//const int
+		id_type = INT;//type
+		id_kind = CONST;//kind
+		if ((did1 = getSym())->type == IDENFR) {//const int iden
+			strcpy(id_name, did1->string);//name
+			if ((did = getSym())->type == ASSIGN) {//const int iden =
+				if (integer() == TRUE) {//const int iden = value
 					if (checkRedefinition(did1) == TRUE) {
 						addID();
 					}
 					else idInitial();
-					while ((did = getSym())->type == COMMA) {
-						id_type = CONSTINT;
+					while ((did = getSym())->type == COMMA) {//const int iden1 = v1,
+						id_type = INT;
+						id_kind = CONST;
 						if ((did1 = getSym())->type == IDENFR) {
 							strcpy(id_name, did1->string);
 							if ((did = getSym())->type == ASSIGN) {
@@ -620,7 +538,8 @@ int conDef() {
 				else {
 					error(did1, o);//常量定义后应该为整型常量
 					while ((did = getSym())->type == COMMA) {
-						id_type = CONSTINT;
+						id_type = INT;
+						id_kind = CONST;
 						if ((did1 = getSym())->type == IDENFR) {
 							strcpy(id_name, did1->string);
 							if ((did = getSym())->type == ASSIGN) {
@@ -648,7 +567,8 @@ int conDef() {
 		}
 	}
 	else if (now->type == CHARTK) {
-		id_type = CONSTCHAR;
+		id_type = CHAR;
+		id_kind = CONST;
 		if ((did1 = getSym())->type == IDENFR) {
 			strcpy(id_name, did1->string);
 			if ((did = getSym())->type == ASSIGN) {
@@ -659,11 +579,13 @@ int conDef() {
 					}
 					else idInitial();
 					while ((did = getSym())->type == COMMA) {
-						id_type = CONSTCHAR;
+						id_kind = CONST;
+						id_type = CHAR;
 						if ((did1 = getSym())->type == IDENFR) {
 							strcpy(id_name, did1->string);
 							if ((did = getSym())->type == ASSIGN) {
 								if ((did = getSym())->type == CHARCON) {
+									id_value = did->string[0];
 									if (checkRedefinition(did1) == TRUE) {
 										addID();
 									}
@@ -686,11 +608,13 @@ int conDef() {
 				else {
 					error(did1, o);//常量定义后应该为字符型常量
 					while ((did = getSym())->type == COMMA) {
-						id_type = CONSTCHAR;
+						id_type = CHAR;
+						id_kind = CONST;
 						if ((did1 = getSym())->type == IDENFR) {
 							strcpy(id_name, did1->string);
 							if ((did = getSym())->type == ASSIGN) {
 								if ((did = getSym())->type == CHARCON) {
+									id_value = did->string[0];
 									if (checkRedefinition(did1) == TRUE) {
 										addID();
 									}
@@ -745,13 +669,14 @@ int conSpe() {
 int factor() {
 	struct word* did;
 	struct word* now = getSym();
-	int tableindex1, tableindex2;
+	struct symbol* symbol1;
+	struct func* symbol2;
 	int judge = FALSE;
 	nowFactor = INT;
 	if (now->type == IDENFR) {
 		if ((did = getSym())->type == LBRACK) {
-			tableindex1 = checkUndefined(now);
-			if (tableindex1 == -1) {
+			symbol1 = checkUndefined(now);
+			if (symbol1 == NULL) {
 				error(now, c);//名字未定义
 			}
 			if (expre() == TRUE) {
@@ -759,7 +684,7 @@ int factor() {
 					error(did, ii);//数组下标都应为整型表达式
 				}
 				if ((did = getSym())->type == RBRACK) {//<标识符>[<表达式>]
-					if (tableindex1 >= 0 && table1[tableindex1]->type == CHARARR) {
+					if (symbol1 != NULL && symbol1->type == STRING) {
 						nowFactor = CHAR;
 					}
 					judge = TRUE;
@@ -775,8 +700,8 @@ int factor() {
 			if (did->type == LPARENT) {
 				back();
 				back();
-				tableindex2 = checkUndefined2(now);
-				if (tableindex2 == -1) {
+				symbol2 = checkUndefined2(now);
+				if (symbol2 == NULL) {
 					error(now, c);//名字未定义
 				}
 				if (reFuncState() == TRUE) {//有返回值函数调用语句
@@ -785,12 +710,12 @@ int factor() {
 			}
 			else {
 				back();
-				tableindex1 = checkUndefined(now);
-				if (tableindex1 == -1) {
+				symbol1 = checkUndefined(now);
+				if (symbol1 == NULL) {
 					error(now, c);//名字未定义
 				}
 				judge = TRUE;//<标识符>
-				if (tableindex1 >= 0 && (table1[tableindex1]->type == CHAR || table1[tableindex1]->type == CONSTCHAR)) {
+				if (symbol1 != NULL && (symbol1->type == CHAR)) {
 					nowFactor = CHAR;
 				}
 			}
@@ -1022,11 +947,11 @@ int assignState() {
 	struct word* now = getSym();
 	struct word* did, * did1;
 	int flag = FALSE;
-	int index = -1;
+	struct symbol* symbol1;
 	if (now->type == IDENFR) {
-		index = checkUndefined(now);
+		symbol1 = checkUndefined(now);
 		if ((did = getSym())->type == ASSIGN) {
-			if (index >= 0 && (table1[index]->type == CONSTCHAR || table1[index]->type == CONSTINT)) {
+			if (symbol1 != NULL && symbol1->kind == CONST) {
 				error(did, j);//不能改变常量的值
 			}
 			if (expre() == TRUE) {
@@ -1097,7 +1022,7 @@ int condition() {
 	}
 	else {
 		back();
-		error(getSym(),f);
+		error(getSym(), f);
 		return TRUE;
 	}
 	return FALSE;
@@ -1219,11 +1144,11 @@ int loopState() {
 		}
 	}
 	else if (now->type == FORTK) {
-		int index_now;
+		struct symbol* symbol1;
 		if ((did = getSym())->type == LPARENT) {
 			if ((did = getSym())->type == IDENFR) {
-				index_now = checkUndefined(did);
-				if (index_now >= 0 && (table1[index_now]->type == CONSTINT || table1[index_now]->type == CONSTCHAR)) {
+				symbol1 = checkUndefined(did);
+				if (symbol1 != NULL && symbol1->kind == CONST) {
 					error(did, j);//不能改变常量的值
 				}
 				if ((did = getSym())->type == ASSIGN) {
@@ -1232,8 +1157,8 @@ int loopState() {
 							if (condition() == TRUE) {
 								if ((did = getSym())->type == SEMICN) {
 									if ((did = getSym())->type == IDENFR) {
-										index_now = checkUndefined(did);
-										if (index_now >= 0 && (table1[index_now]->type == CONSTINT || table1[index_now]->type == CONSTCHAR)) {
+										symbol1 = checkUndefined(did);
+										if (symbol1 != NULL && symbol1->kind == CONST) {
 											error(did, j);//不能改变常量的值
 										}
 										if ((did = getSym())->type == ASSIGN) {
@@ -1316,17 +1241,18 @@ int valueParaTable() {
 //<有返回值函数调用语句>
 int reFuncState() {
 	struct word* did1, * did2, * did3;
-	int tableindex, judge = FALSE;
+	int judge = FALSE;
+	struct func* function;
 	if ((did1 = getSym())->type == IDENFR) {
 		if ((did2 = getSym())->type == LPARENT) {
-			tableindex = checkUndefined2(did1);
-			if (tableindex == -1) {
+			function = checkUndefined2(did1);
+			if (function == NULL) {
 				error(did1, c);
 				judge = TRUE;
 			}
-			else if (tableindex >= 0 && table2[tableindex]->type != NONE) {
+			else if (function != NULL && function->type != NONE) {
 				judge = TRUE;
-				nowFunc = table2[tableindex];
+				nowFunc = function;
 				func_test = TRUE;
 				nowFactor = nowFunc->type;
 			}
@@ -1359,13 +1285,14 @@ int reFuncState() {
 //<无返回值函数调用语句>
 int nonFuncState() {
 	struct word* did1, * did2, * did3;
-	int tableIndex, judge = FALSE;
+	int judge = FALSE;
+	struct func* function;
 	if ((did1 = getSym())->type == IDENFR) {
 		if ((did2 = getSym())->type == LPARENT) {
-			tableIndex = checkUndefined2(did1);
-			if (tableIndex >= 0) {
+			function = checkUndefined2(did1);
+			if (function != NULL) {
 				judge = TRUE;
-				nowFunc = table2[tableIndex];
+				nowFunc = function;
 				func_test = TRUE;
 				nowFactor = nowFunc->type;
 			}
@@ -1476,6 +1403,7 @@ int paraTable() {
 	int type;
 	if (typeIden() == TRUE) {
 		type = getSym()->type;
+		id_kind = PARA;
 		switch (type)
 		{
 		case INTTK:
@@ -1498,6 +1426,7 @@ int paraTable() {
 			while ((did = getSym())->type == COMMA) {
 				if (typeIden() == TRUE) {
 					type = getSym()->type;
+					id_kind = PARA;
 					switch (type)
 					{
 					case INTTK:
@@ -1548,21 +1477,24 @@ int reFunc() {
 	struct word* did;
 	if (headState() == TRUE) { // headState（）只有有返回值函数定义使用
 		if ((did = getSym())->type == LPARENT) {
-			nowLayer++;
+			/* addFunction()  begin*/
+			struct func* function = (struct func*)malloc(sizeof(struct func));
+			strcpy(function->name, func_name);
+			function->begin = NULL;
+			function->end = NULL;
+			function->type = func_type;
+			if (checkRedefinition2(did) == TRUE) {
+				funcTable_index++;
+				funcTable[funcTable_index] = function;
+			}
+			else {
+				error(did, b);//重定义
+			}
+			/* addFunction()  end*/
 			if (paraTable() == TRUE) {
 
-				/* addFunction()  begin*/
-				struct func* function;
-				function = (struct func*)malloc(sizeof(struct func));
-				strcpy(function->name, func_name);
-				function->type = func_type;
-				function->valueNum = func_index + 1;
-				memcpy(function->arrValue, func_arrValue, sizeof(func_arrValue));
-
-				table2[table2_index] = function;
-				table2_index++;
-
-				/* addFunction()  end*/
+				funcTable[funcTable_index]->valueNum = func_index + 1;
+				memcpy(funcTable[funcTable_index]->arrValue, func_arrValue, sizeof(func_arrValue));
 
 				if ((did = getSym())->type == RPARENT) {
 					if ((did = getSym())->type == LBRACE) {
@@ -1571,14 +1503,7 @@ int reFunc() {
 								if (func_return == FALSE) {
 									error(did, h);//有返回值函数缺少return语句，报错在当前函数}位置
 								}
-								//将函数中定义的局部变量从符号表中删除
-								table1_index--;
-								while (table1_index >= 0 && table1[table1_index]->layer == nowLayer) {
-									table1[table1_index] = NULL;
-									table1_index--;
-								}
-								table1_index++;
-								nowLayer--;
+								funcTable[funcTable_index]->end = id_before;
 								funcInitial();
 								return TRUE;
 							}
@@ -1593,14 +1518,7 @@ int reFunc() {
 								if (func_return == FALSE) {
 									error(did, h);//有返回值函数缺少return语句，报错在当前函数}位置
 								}
-								//将函数中定义的局部变量从符号表中删除
-								table1_index--;
-								while (table1_index >= 0 && table1[table1_index]->layer == nowLayer) {
-									table1[table1_index] = NULL;
-									table1_index--;
-								}
-								table1_index++;
-								nowLayer--;
+								funcTable[funcTable_index]->end = id_before;
 								funcInitial();
 								return TRUE;
 							}
@@ -1623,36 +1541,30 @@ int nonFunc() {
 		if ((did = getSym())->type == IDENFR) {
 			strcpy(func_name, did->string);
 			if ((did = getSym())->type == LPARENT) {
-				nowLayer++;
+				/* addFunction() begin*/
+				struct func* function = (struct func*)malloc(sizeof(struct func));
+				strcpy(function->name, func_name);
+				function->begin = NULL;
+				function->end = NULL;
+				function->type = func_type;
+				if (checkRedefinition2(did) == TRUE) {
+					funcTable_index++;
+					funcTable[funcTable_index] = function;
+				}
+				else {
+					error(did, b);//重定义
+				}
+				/* addFunction() end*/
 				if (paraTable() == TRUE) {
-					/* addFunction() begin*/
-					struct func* function;
-					function = (struct func*)malloc(sizeof(struct func));
-					strcpy(function->name, func_name);
-					function->type = func_type;
-					function->valueNum = func_index + 1;
-					memcpy(function->arrValue, func_arrValue, sizeof(func_arrValue));
-					if (checkRedefinition2(did) == TRUE) {
-						table2[table2_index] = function;
-						table2_index++;
-					}
-					else {
-						error(did, b);//重定义
-					}
-					funcInitial();
-					/* addFunction() end*/
-
+					funcTable[funcTable_index]->valueNum = func_index + 1;
+					memcpy(funcTable[funcTable_index]->arrValue, func_arrValue, 
+						sizeof(func_arrValue));
 					if ((did = getSym())->type == RPARENT) {
 						if ((did = getSym())->type == LBRACE) {
 							if (comState() == TRUE) {
 								if ((did = getSym())->type == RBRACE) {
-									table1_index--;
-									while ( table1_index >=0 && table1[table1_index]->layer == nowLayer) {
-										table1[table1_index] = NULL;
-										table1_index--;
-									}
-									nowLayer--;
-									table1_index++;
+									funcTable[funcTable_index]->end = id_before;
+									funcInitial();
 									return TRUE;
 								}
 							}
@@ -1663,13 +1575,8 @@ int nonFunc() {
 						if ((did = getSym())->type == LBRACE) {
 							if (comState() == TRUE) {
 								if ((did = getSym())->type == RBRACE) {
-									table1_index--;
-									while (table1_index >= 0 && table1[table1_index]->layer == nowLayer) {
-										table1[table1_index] = NULL;
-										table1_index--;
-									}
-									nowLayer--;
-									table1_index++;
+									funcTable[funcTable_index]->end = id_before;
+									funcInitial();
 									return TRUE;
 								}
 							}
@@ -1696,9 +1603,18 @@ int mainFunc() {
 		if ((did = getSym())->type == MAINTK) {
 			if ((did = getSym())->type == LPARENT) {
 				if ((did = getSym())->type == RPARENT) {
+					struct func* mainFunc = (struct func*)malloc(sizeof(struct func));
+					mainFunc->begin = NULL;
+					mainFunc->end = NULL;
+					strcpy(mainFunc->name, "main");
+					mainFunc->type = NONE;
+					funcTable_index++;
+					funcTable[funcTable_index] = mainFunc;
+
 					if ((did = getSym())->type == LBRACE) {
 						if (comState() == TRUE) {
 							if ((did = getSym())->type == RBRACE) {
+								funcTable[funcTable_index]->end = id_before;
 								return TRUE;
 							}
 						}
@@ -1709,6 +1625,7 @@ int mainFunc() {
 					if ((did = getSym())->type == LBRACE) {
 						if (comState() == TRUE) {
 							if ((did = getSym())->type == RBRACE) {
+								funcTable[funcTable_index]->end = id_before;
 								return TRUE;
 							}
 						}
@@ -1729,10 +1646,20 @@ int mainFunc() {
 void program() {
 	this = head;
 	int flag = FALSE;
-	nowSymbol = (struct symbol*)malloc(sizeof(struct symbol));
-	nowFunc = (struct func*)malloc(sizeof(struct func));
+
+	struct func* func0 = (struct func*)malloc(sizeof(struct func));//全局
+	func0->begin = NULL;
+	func0->end = NULL;
+	strcpy(func0->name, "main0");
+	func0->type = NONE;
+	funcTable_index++;
+	funcTable[funcTable_index] = func0;//funcTable[0]是全局
+
 	conSpe();
 	varSpe();
+	funcTable[0]->end = id_before;
+	funcInitial();
+
 	while (reFunc() == TRUE || nonFunc() == TRUE);
 	if (mainFunc() == TRUE) {
 		flag = TRUE;
@@ -1749,7 +1676,6 @@ void addType(int type) {
 	struct word* one;
 	one = (struct word*)malloc(sizeof(struct word));
 	one->type = type;
-	one->colNum = numCol;
 	strcpy(one->string, text[type]);
 
 	one->before = pre;
@@ -1762,6 +1688,8 @@ void addType2(int type, char* str) {
 	one = (struct word*) malloc(sizeof(struct word));
 	one->type = type;
 	one->colNum = numCol;
+	one->before = NULL;
+	one->next = NULL;
 	strcpy(one->string, str);
 	if (type == CHARCON) {
 		char c = str[0];

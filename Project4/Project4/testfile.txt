@@ -1,0 +1,25 @@
+const int const1 = 1,const2 = 2;
+const char const3 = 'a',const4 = 'b';
+const int const5 = 12;
+const char const6 = 'z';
+
+int var1,var2,var3[12];
+char var4,var5[19];
+
+int t1(int n1,int n2,char n3){
+	const int const7 = 122;
+	int i;
+
+	i = i+const7;
+	return(i);
+}
+
+void t2(int t1,int t2){
+	int j;
+	j = const1 + const2;
+}
+
+void main(){
+	int num1,num2;
+	int arr[10];
+}
