@@ -1404,17 +1404,22 @@ int paraTable() {
 	if (typeIden() == TRUE) {
 		type = getSym()->type;
 		id_kind = PARA;
+		struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+		mid_now->next = mid;
+		mid_now = mid;
 		switch (type)
 		{
 		case INTTK:
 			func_index++;
 			func_arrValue[func_index] = INT;
 			id_type = INT;
+			strcpy(mid_now->x, "para int ");
 			break;
 		case CHARTK:
 			func_index++;
 			func_arrValue[func_index] = CHAR;
 			id_type = CHAR;
+			strcpy(mid_now->x, "para char ");
 			break;
 		default:
 			break;
@@ -1423,21 +1428,27 @@ int paraTable() {
 			judge = TRUE;
 			strcpy(id_name, did->string);
 			addID();
+			strcat(mid_now->x, id_name);
 			while ((did = getSym())->type == COMMA) {
 				if (typeIden() == TRUE) {
 					type = getSym()->type;
 					id_kind = PARA;
+					struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+					mid_now->next = mid;
+					mid_now = mid;
 					switch (type)
 					{
 					case INTTK:
 						func_index++;
 						func_arrValue[func_index] = INT;
 						id_type = INT;
+						strcpy(mid_now->x, "para int ");
 						break;
 					case CHARTK:
 						func_index++;
 						func_arrValue[func_index] = CHAR;
 						id_type = CHAR;
+						strcpy(mid_now->x, "para char ");
 						break;
 					default:
 						break;
@@ -1446,6 +1457,7 @@ int paraTable() {
 					if ((did = getSym())->type == IDENFR) {
 						judge = TRUE;
 						strcpy(id_name, did->string);
+						strcat(mid_now->x, id_name);
 						addID();
 					}
 					else {
@@ -1491,6 +1503,22 @@ int reFunc() {
 				error(did, b);//重定义
 			}
 			/* addFunction()  end*/
+
+			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			mid_now->next = mid;
+			mid_now = mid;
+			//type name()
+			switch (func_type) {
+			case INT:
+				strcpy(mid_now->x, strcat("int ", strcat(func_name, "()")));
+				break;
+			case CHAR:
+				strcpy(mid_now->x, strcat("char ", strcat(func_name, "()")));
+				break;
+			default:
+				break;
+			}
+
 			if (paraTable() == TRUE) {
 
 				funcTable[funcTable_index]->valueNum = func_index + 1;
@@ -1554,10 +1582,16 @@ int nonFunc() {
 				else {
 					error(did, b);//重定义
 				}
+
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				mid_now->next = mid;
+				mid_now = mid;
+				//void name()
+				strcpy(mid_now->x, strcat("void ", strcat(func_name, "()")));
 				/* addFunction() end*/
 				if (paraTable() == TRUE) {
 					funcTable[funcTable_index]->valueNum = func_index + 1;
-					memcpy(funcTable[funcTable_index]->arrValue, func_arrValue, 
+					memcpy(funcTable[funcTable_index]->arrValue, func_arrValue,
 						sizeof(func_arrValue));
 					if ((did = getSym())->type == RPARENT) {
 						if ((did = getSym())->type == LBRACE) {
@@ -1601,6 +1635,10 @@ int mainFunc() {
 	struct word* nowWord = getSym();
 	if (nowWord->type == VOIDTK) {
 		if ((did = getSym())->type == MAINTK) {
+			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			mid_now->next = mid;
+			mid_now = mid;
+			strcpy(mid_now->x, "void main()");
 			if ((did = getSym())->type == LPARENT) {
 				if ((did = getSym())->type == RPARENT) {
 					struct func* mainFunc = (struct func*)malloc(sizeof(struct func));
@@ -1655,6 +1693,8 @@ void program() {
 	funcTable_index++;
 	funcTable[funcTable_index] = func0;//funcTable[0]是全局
 
+	midCode = (struct mid*)malloc(sizeof(struct mid));
+	mid_now = midCode;
 	conSpe();
 	varSpe();
 	funcTable[0]->end = id_before;

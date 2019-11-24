@@ -32,6 +32,21 @@ char name[36][10] = {
 {"MINU"}, {"MULT"}, {"DIV"}, {"LSS"}, {"LEQ"}, {"GRE"}, {"GEQ"}, {"EQL"}, {"NEQ"}, {"ASSIGN"}, {"SEMICN"}, {"COMMA"},{"LPARENT"},{"RPARENT"}, {"LBRACK"}, {"RBRACK"}, {"LBRACE"}, {"RBRACE"}
 };
 
+enum opCode {
+	PUSH = 36, RET, CALL, BNZ, BZ
+};
+
+struct mid {
+	int op;
+	char x[2014];
+	char y[2014];
+	char z[2014];
+	struct mid* next;
+}mid = { "'\0'","'\0'","'\0'", NULL };
+
+struct mid* midCode,*mid_now;
+
+
 struct word {
 	char string[1024];
 	int type;
