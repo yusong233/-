@@ -33,10 +33,10 @@ char name[36][10] = {
 };
 
 enum opCode {
-	PUSH = 36, RET, CALL, BNZ, BZ
+	PUSH = 36, RET, CALL, BNZ, BZ,ARR,DEVIATION//Êı×éÆ«ÒÆ
 };
 
-struct mid {
+struct mid { // z = x op y
 	int op;
 	char x[2014];
 	char y[2014];
@@ -119,6 +119,9 @@ int nowExpre = NONE;
 int nowItem = NONE;
 int nowFactor = NONE;
 
+//var
+int var_index = -1;
+
 //word
 void readWord();
 
@@ -138,6 +141,13 @@ int expre();
 int stateColumn();
 
 void program();
+
+//¹é»¹var
+void backVarIndex() {
+	if (var_index > -1) {
+		var_index--;
+	}
+}
 
 
 

@@ -787,7 +787,10 @@ int expre() {
 	struct word* now = getSym();
 	int judge = FALSE;
 	nowExpre = INT;
+	struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
 	if (now->type == PLUS || now->type == MINU) {
+		
+		mid->op = now->type;
 		judge = FALSE;
 	}
 	else back();
@@ -955,6 +958,8 @@ int assignState() {
 				error(did, j);//不能改变常量的值
 			}
 			if (expre() == TRUE) {
+				strcpy(mid_now->z, now->string);// iden = expre();
+				backVarIndex();//归还expre使用的寄存器
 				flag = TRUE;
 			}
 		}
@@ -963,9 +968,20 @@ int assignState() {
 				if (nowExpre != INT) {
 					error(did, ii);//数组下标必须是整型
 				}
+				
+				struct mid* mid1 = (struct mid*)malloc(sizeof(struct mid));
+				mid1->op = DEVIATION;
+				strcpy(mid1 ->x, now->string);
+				strcpy(mid1->y, mid_now->z);
+				strcpy(mid1->z, mid_now->z);
+				mid_now->next = mid1;
+				mid_now = mid1;
+
 				if ((did1 = getSym())->type == RBRACK) {
 					if ((did = getSym())->type == ASSIGN) {
 						if (expre() == TRUE) {
+							strcpy(mid_now->z, mid1->z);
+							backVarIndex();
 							flag = TRUE;
 						}
 					}
@@ -1212,6 +1228,12 @@ int valueParaTable() {
 			error(getSym(), e);//函数参数类型不匹配
 		}
 		i++;
+		struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+		mid->op = PUSH;
+		strcpy(mid->x ,mid_now->z);
+		mid_now->next = mid;
+		mid_now = mid;
+		
 		while ((did1 = getSym())->type == COMMA) {
 			flag = FALSE;
 			if (expre() == TRUE) {
@@ -1220,6 +1242,11 @@ int valueParaTable() {
 					error(getSym(), e);//函数参数类型不匹配
 				}
 				i++;
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				mid->op = PUSH;
+				strcpy(mid->x, mid_now->z);
+				mid_now->next = mid;
+				mid_now = mid;
 				flag = TRUE;
 			}
 		}
@@ -1260,6 +1287,11 @@ int reFuncState() {
 				if (valueParaTable() == TRUE) {
 					if ((did3 = getSym())->type == RPARENT) {
 						return TRUE;
+						struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+						mid->op = CALL;
+						strcpy(mid->x, did1->string);//call func_name
+						mid_now->next = mid;
+						mid_now = mid;
 					}
 					else {
 						error(did3, l);//缺少）
@@ -1303,6 +1335,11 @@ int nonFuncState() {
 			if (judge == TRUE) {
 				if (valueParaTable() == TRUE) {
 					if ((did3 = getSym())->type == RPARENT) {
+						struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+						mid->op = CALL;
+						strcpy(mid->x, did1->string);//call func_name
+						mid_now->next = mid;
+						mid_now = mid;
 						return TRUE;
 					}
 					else {
