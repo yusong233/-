@@ -7,6 +7,29 @@
 #include <string.h>
 #include "useType.h"
 
+void initialMid(struct mid* m) {
+	strcpy(m->x, "\0");
+	strcpy(m->y, "\0");
+	strcpy(m->z, "\0");
+	m->op = NONE;
+}
+
+//归还var
+void backVarIndex() {
+	if (var_index > -1) {
+		var_index--;
+	}
+}
+
+char* getVarIndex() {
+	char c[1024] = "\#";
+	char s[1024] = "\0";
+	var_index++;
+	sprintf(s, "%d", var_index);
+	strcat(c, s);
+	return c;//#var_index
+}
+
 //重置id
 void idInitial() {
 	memset(id_name, '\0', sizeof(id_name));
@@ -130,19 +153,19 @@ struct func* checkUndefined2(struct word* now) {//检查函数未定义，返回
 }
 
 struct word* getSym() {
-	struct word* nowWord = this;
-	pre = this;
-	this = this->next;
+	struct word* nowWord = it;
+	pre = it;
+	it = it->next;
 	return nowWord;
 }
 
 void back() {
-	if (this == NULL) {
-		this = pre;
+	if (it == NULL) {
+		it = pre;
 	}
 	else {
-		this = this->before;
-		pre = this->before;
+		it = it->before;
+		pre = it->before;
 	}
 }
 
@@ -688,11 +711,20 @@ int factor() {
 						nowFactor = CHAR;
 					}
 					judge = TRUE;
+					struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+					initialMid(mid);
+					strcpy(mid->x, now->string);
+					strcpy(mid->y, mid_now->z);
+					strcpy(mid->z, mid_now->z);
+					mid->op = DEVIATION;
+					mid_now->next = mid;
+					mid_now = mid;
 				}
 				else {
 					error(did, m);//无]
 					judge = TRUE;
 				}
+
 			}
 			else judge = FALSE;
 		}
@@ -704,20 +736,36 @@ int factor() {
 				if (symbol2 == NULL) {
 					error(now, c);//名字未定义
 				}
-				if (reFuncState() == TRUE) {//有返回值函数调用语句
+				if (reFuncState() == TRUE) {//有返回值函数调用语句 
+
+					struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+					initialMid(mid);
+					strcpy(mid->x, "ret");
+					strcpy(mid->z, getVarIndex());
+					mid_now->next = mid;
+					mid_now = mid;
+
 					judge = TRUE;
 				}
 			}
-			else {
+			else { //<标识符>
 				back();
 				symbol1 = checkUndefined(now);
 				if (symbol1 == NULL) {
 					error(now, c);//名字未定义
 				}
-				judge = TRUE;//<标识符>
+				judge = TRUE;
 				if (symbol1 != NULL && (symbol1->type == CHAR)) {
 					nowFactor = CHAR;
 				}
+
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
+				strcpy(mid->x, now->string);
+				strcpy(mid->z, getVarIndex());
+				mid_now->next = mid;
+				mid_now = mid;
+
 			}
 		}
 	}
@@ -740,10 +788,28 @@ int factor() {
 	}
 	else {
 		back();
-		if (integer() == TRUE) {//<整数>
+		if (integer() == TRUE) {//<整数> 将整数的值存放在id_value中
+
+			char s[1024] = { '\0' };
+			sprintf(s, "%d", id_value);
+			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			initialMid(mid);
+			strcpy(mid->x, s);
+			strcpy(mid->z, getVarIndex());
+			mid_now->next = mid;
+			mid_now = mid;
+
 			judge = TRUE;
 		}
 		else if ((now = getSym())->type == CHARCON) {//<字符>
+
+			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			initialMid(mid);
+			strcpy(mid->x, now->string);
+			strcpy(mid->z, getVarIndex());
+			mid_now->next = mid;
+			mid_now = mid;
+
 			nowFactor = CHAR;
 			judge = TRUE;
 		}
@@ -764,9 +830,24 @@ int item() {
 	int judge = FALSE;
 	nowItem = INT;
 	if (factor() == TRUE) {
+		struct mid* mid1, * mid2;
+		mid1 = mid_now;
 		judge = TRUE;
 		while ((did = getSym())->type == MULT || did->type == DIV) {
 			if (factor() == TRUE) {
+				mid2 = mid_now;
+
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
+				strcpy(mid->x, mid1->z);
+				strcpy(mid->y, mid2->z);
+				strcpy(mid->z, mid1->z);
+				mid->op = did->type;
+				mid_now->next = mid;
+				mid_now = mid;
+
+				backVarIndex();
+				mid1 = mid_now;
 				judge = TRUE;
 			}
 			nowFactor = INT;
@@ -787,19 +868,45 @@ int expre() {
 	struct word* now = getSym();
 	int judge = FALSE;
 	nowExpre = INT;
+	int add = 0;
 	struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+	initialMid(mid);
 	if (now->type == PLUS || now->type == MINU) {
-		
-		mid->op = now->type;
+		if (now->type == MINU) {
+			add = 1;
+			mid->op = MINU;
+			strcpy(mid->x, "0");
+		}
 		judge = FALSE;
 	}
 	else back();
-
+	struct mid* mid1, * mid2;
 	if (item() == TRUE) {
 		judge = TRUE;
+		if (add == 1) {
+			strcpy(mid->y, mid_now->z);
+			strcpy(mid->z, mid_now->z);
+			mid_now->next = mid;
+			mid_now = mid;
+		}
+		mid1 = mid_now;
 		while ((now = getSym())->type == PLUS || now->type == MINU) {
 			judge = FALSE;
 			if (item() == TRUE) {
+				mid2 = mid_now;
+
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
+				strcpy(mid->x, mid1->z);
+				strcpy(mid->y, mid2->z);
+				strcpy(mid->z, mid1->z);
+				mid->op = now->type;
+				mid_now->next = mid;
+				mid_now = mid;
+
+				backVarIndex();
+
+				mid1 = mid_now;
 				judge = TRUE;
 			}
 			else judge = FALSE;
@@ -817,15 +924,31 @@ int expre() {
 }
 
 //<读语句>
-int readState() {
+int readState() {//scanf(标识符{，标识符})
 	struct word* now, * did;
 	int flag = TRUE;
 	if ((now = getSym())->type == SCANFTK) {
 		if ((did = getSym())->type == LPARENT) {
 			if ((did = getSym())->type == IDENFR) {
+
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
+				strcpy(mid->x, did->string);
+				mid->op = READ;
+				mid_now->next = mid;
+				mid_now = mid;
+
 				checkUndefined(did);
 				while ((did = getSym())->type == COMMA) {
 					if ((did = getSym())->type == IDENFR) {
+
+						struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+						initialMid(mid);
+						strcpy(mid->x, did->string);
+						mid->op = READ;
+						mid_now->next = mid;
+						mid_now = mid;
+
 						checkUndefined(did);
 						flag = TRUE;
 					}
@@ -853,9 +976,14 @@ int writeState() {
 	if ((now = getSym())->type == PRINTFTK) {
 		if ((did = getSym())->type == LPARENT) {
 			if ((did = getSym())->type == STRCON) {
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
+				strcpy(mid->x, did->string);
+				mid->op = WRITE;
 				if ((did = getSym())->type == COMMA) {
 					if (expre() == TRUE) {
 						if ((did = getSym())->type == RPARENT) {
+							strcpy(mid->y, mid_now->z);
 							flag = TRUE;
 						}
 						else {
@@ -865,16 +993,28 @@ int writeState() {
 					}
 				}
 				else if (did->type == RPARENT) {
+
 					flag = TRUE;
 				}
 				else {
 					error(did, l);//缺少）
 					flag = TRUE;
 				}
+
+				mid_now->next = mid;
+				mid_now = mid;
 			}
 			else {
 				back();
 				if (expre() == TRUE) {
+
+					struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+					initialMid(mid);
+					strcpy(mid->x, mid_now->z);
+					mid->op = WRITE;
+					mid_now->next = mid;
+					mid_now = mid;
+
 					if ((did = getSym())->type == RPARENT) {
 						flag = TRUE;
 					}
@@ -901,6 +1041,7 @@ int returnState() {
 	struct word* now, * did;
 	if ((now = getSym())->type == RETURNTK) {
 		flag = TRUE;
+
 		if (func_type == NONE) {
 			if (now->next->type != SEMICN) {
 				error(now, g);//无返回值函数多余的return语句
@@ -915,6 +1056,7 @@ int returnState() {
 				return TRUE;
 			}
 		}
+
 		if ((did = getSym())->type == LPARENT) {
 			flag = FALSE;
 			if (expre() == TRUE) {
@@ -934,6 +1076,14 @@ int returnState() {
 					flag = TRUE;
 				}
 			}
+
+			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			initialMid(mid);
+			strcpy(mid->x, mid_now->z);
+			mid->op = RET;
+			mid_now->next = mid;
+			mid_now = mid;
+
 		}
 		else back();
 	}
@@ -968,10 +1118,11 @@ int assignState() {
 				if (nowExpre != INT) {
 					error(did, ii);//数组下标必须是整型
 				}
-				
+
 				struct mid* mid1 = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid1);
 				mid1->op = DEVIATION;
-				strcpy(mid1 ->x, now->string);
+				strcpy(mid1->x, now->string);
 				strcpy(mid1->y, mid_now->z);
 				strcpy(mid1->z, mid_now->z);
 				mid_now->next = mid1;
@@ -991,6 +1142,8 @@ int assignState() {
 					error(getSym(), m);//缺少]
 					if ((did = getSym())->type == ASSIGN) {
 						if (expre() == TRUE) {
+							strcpy(mid_now->z, mid1->z);
+							backVarIndex();
 							flag = TRUE;
 						}
 					}
@@ -1229,11 +1382,12 @@ int valueParaTable() {
 		}
 		i++;
 		struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+		initialMid(mid);
 		mid->op = PUSH;
-		strcpy(mid->x ,mid_now->z);
+		strcpy(mid->x, mid_now->z);
 		mid_now->next = mid;
 		mid_now = mid;
-		
+
 		while ((did1 = getSym())->type == COMMA) {
 			flag = FALSE;
 			if (expre() == TRUE) {
@@ -1243,6 +1397,7 @@ int valueParaTable() {
 				}
 				i++;
 				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
 				mid->op = PUSH;
 				strcpy(mid->x, mid_now->z);
 				mid_now->next = mid;
@@ -1287,11 +1442,14 @@ int reFuncState() {
 				if (valueParaTable() == TRUE) {
 					if ((did3 = getSym())->type == RPARENT) {
 						return TRUE;
+
 						struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+						initialMid(mid);
+						strcpy(mid->x, did1->string);
 						mid->op = CALL;
-						strcpy(mid->x, did1->string);//call func_name
 						mid_now->next = mid;
 						mid_now = mid;
+
 					}
 					else {
 						error(did3, l);//缺少）
@@ -1336,6 +1494,7 @@ int nonFuncState() {
 				if (valueParaTable() == TRUE) {
 					if ((did3 = getSym())->type == RPARENT) {
 						struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+						initialMid(mid);
 						mid->op = CALL;
 						strcpy(mid->x, did1->string);//call func_name
 						mid_now->next = mid;
@@ -1442,6 +1601,7 @@ int paraTable() {
 		type = getSym()->type;
 		id_kind = PARA;
 		struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+		initialMid(mid);
 		mid_now->next = mid;
 		mid_now = mid;
 		switch (type)
@@ -1464,6 +1624,7 @@ int paraTable() {
 		if ((did = getSym())->type == IDENFR) {
 			judge = TRUE;
 			strcpy(id_name, did->string);
+			strcat(mid_now->x, id_name);
 			addID();
 			strcat(mid_now->x, id_name);
 			while ((did = getSym())->type == COMMA) {
@@ -1471,6 +1632,7 @@ int paraTable() {
 					type = getSym()->type;
 					id_kind = PARA;
 					struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+					initialMid(mid);
 					mid_now->next = mid;
 					mid_now = mid;
 					switch (type)
@@ -1542,15 +1704,19 @@ int reFunc() {
 			/* addFunction()  end*/
 
 			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			initialMid(mid);
 			mid_now->next = mid;
 			mid_now = mid;
 			//type name()
+			char s[1024] = { '\0' };
 			switch (func_type) {
 			case INT:
-				strcpy(mid_now->x, strcat("int ", strcat(func_name, "()")));
+				strcpy(s, "int ");
+				strcpy(mid_now->x, strcat(s, strcat(func_name, "()")));
 				break;
 			case CHAR:
-				strcpy(mid_now->x, strcat("char ", strcat(func_name, "()")));
+				strcpy(s, "char ");
+				strcpy(mid_now->x, strcat(s, strcat(func_name, "()")));
 				break;
 			default:
 				break;
@@ -1621,10 +1787,12 @@ int nonFunc() {
 				}
 
 				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
 				mid_now->next = mid;
 				mid_now = mid;
 				//void name()
-				strcpy(mid_now->x, strcat("void ", strcat(func_name, "()")));
+				char s[1024] = "void ";
+				strcpy(mid_now->x, strcat(s, strcat(func_name, "()")));
 				/* addFunction() end*/
 				if (paraTable() == TRUE) {
 					funcTable[funcTable_index]->valueNum = func_index + 1;
@@ -1673,6 +1841,7 @@ int mainFunc() {
 	if (nowWord->type == VOIDTK) {
 		if ((did = getSym())->type == MAINTK) {
 			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			initialMid(mid);
 			mid_now->next = mid;
 			mid_now = mid;
 			strcpy(mid_now->x, "void main()");
@@ -1719,7 +1888,7 @@ int mainFunc() {
 
 //<程序>
 void program() {
-	this = head;
+	it = head;
 	int flag = FALSE;
 
 	struct func* func0 = (struct func*)malloc(sizeof(struct func));//全局
@@ -1731,6 +1900,7 @@ void program() {
 	funcTable[funcTable_index] = func0;//funcTable[0]是全局
 
 	midCode = (struct mid*)malloc(sizeof(struct mid));
+	initialMid(midCode);
 	mid_now = midCode;
 	conSpe();
 	varSpe();
@@ -2021,6 +2191,10 @@ void readWord() {
 	head->before = NULL;
 }
 
+void printTable() {
+
+}
+
 int main() {
 
 	if ((fp1 = fopen("testfile.txt", "r")) == NULL) {
@@ -2033,6 +2207,9 @@ int main() {
 	readWord();
 
 	program();
+	midCode = midCode->next;
+
+	printTable();
 
 	fclose(fp1);
 	fclose(fp2);

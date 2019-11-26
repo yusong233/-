@@ -126,7 +126,7 @@
     <ClInclude Include="useType.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="hw.c" />
+    <ClCompile Include="hw.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

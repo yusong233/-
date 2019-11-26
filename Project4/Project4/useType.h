@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <string.h>
 
 enum type {
 	IDENFR = 0, INTCON, CHARCON, STRCON, CONSTTK, INTTK, CHARTK, VOIDTK, MAINTK,
@@ -33,7 +35,8 @@ char name[36][10] = {
 };
 
 enum opCode {
-	PUSH = 36, RET, CALL, BNZ, BZ,ARR,DEVIATION//数组偏移
+	PUSH = 36, RET, CALL, BNZ, BZ,ARR,DEVIATION,//数组偏移
+	READ,WRITE
 };
 
 struct mid { // z = x op y
@@ -42,10 +45,9 @@ struct mid { // z = x op y
 	char y[2014];
 	char z[2014];
 	struct mid* next;
-}mid = { "'\0'","'\0'","'\0'", NULL };
+};
 
 struct mid* midCode,*mid_now;
-
 
 struct word {
 	char string[1024];
@@ -82,7 +84,7 @@ int numCol = 1;//读入文件的行号
 //这三个变量在词法分析和语法分析部分指代word链表
 struct word* head;
 struct word* pre;
-struct word* this;
+struct word* it;
 
 //这两个在program初始化
 struct symbol* nowSymbol;
@@ -119,6 +121,9 @@ int nowExpre = NONE;
 int nowItem = NONE;
 int nowFactor = NONE;
 
+//mid
+char nnn[1] = { '\0' };
+
 //var
 int var_index = -1;
 
@@ -142,12 +147,30 @@ int stateColumn();
 
 void program();
 
+void initialMid(struct mid* m) {
+	strcpy(m->x, "\0");
+	strcpy(m->y, "\0");
+	strcpy(m->z, "\0");
+	m->op = NONE;
+}
+
 //归还var
 void backVarIndex() {
 	if (var_index > -1) {
 		var_index--;
 	}
 }
+
+char* getVarIndex() {
+	char c[1024] = "\#";
+	char s[1024] = "\0";
+	var_index++;
+	sprintf(s, "%d", var_index);
+	strcat(c, s);
+	return c;//#var_index
+}
+
+
 
 
 
