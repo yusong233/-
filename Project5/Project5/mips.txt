@@ -1,0 +1,57 @@
+.data
+_begini: .word 0
+_endi: .word 18
+testfg: .word -6
+string0 : .asciiz "this is if2 true branch"
+string1 : .asciiz "this is if2 false branch"
+string2 : .asciiz "from"
+huanhang : .asciiz "\n"
+.text
+j main
+main:
+li $8,1
+sw $8, 2147479540
+lw $8, 2147479540
+bnez $8,if_0
+lw $11, 2147479540
+li $12,1
+sub $11,$11,$12
+sw $11, 2147479540
+li $v0,4
+la $a0,string2
+syscall
+li $v0,4
+la $a0,huanhang
+syscall
+j next_0
+if_0:
+lw $9, 2147479540
+li $10,10
+add $9,$9,$10
+sw $9, 2147479540
+lw $9, 2147479540
+lw $10, _endi
+blt $9,$10,if_1
+li $v0,4
+la $a0,string1
+syscall
+li $v0,4
+la $a0,huanhang
+syscall
+j next_1
+if_1:
+li $v0,4
+la $a0,string0
+syscall
+li $v0,4
+la $a0,huanhang
+syscall
+next_1:
+next_0:
+lw $11, 2147479540
+li $v0,1
+move $a0,$11
+syscall
+li $v0,4
+la $a0,huanhang
+syscall

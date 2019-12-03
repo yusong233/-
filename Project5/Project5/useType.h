@@ -25,7 +25,7 @@ enum chararacter {
 char charact[15] = { 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o' };
 
 char text[45][10] = {
-	{""},{""},{""},{""},{"const"},{"int"},{"char"},{"void"},{"main"},{"if"},{"else"},{"do"},{"while"},{"for"},{"scanf"},{"printf"},{"return"},{"+"},{"-"},{"*"},{"/"},{"<"},{"<="},{">"},{">="},{"=="},{"!="},{"="},{";"},{","},{"("},{")"},{"["},{"]"},{"{"},{"}"},{"PUSH"},{"RET"},{"CALL"},{"BNZ"},{"BZ"},{"[]"},{"READ"},{"WRITE"},{"ASS"}
+	{""},{""},{""},{""},{"const"},{"int"},{"char"},{"void"},{"main"},{"if"},{"else"},{"do"},{"while"},{"for"},{"scanf"},{"printf"},{"return"},{"+"},{"-"},{"*"},{"/"},{"<"},{"<="},{">"},{">="},{"=="},{"!="},{"="},{";"},{","},{"("},{")"},{"["},{"]"},{"{"},{"}"},{"PUSH"},{"RET"},{"CALL"},{"BNEZ"},{"[]"},{"READ"},{"WRITE"},{"ASS"},{"FUNC"}
 };
 
 char name[36][10] = {
@@ -37,8 +37,11 @@ char name[36][10] = {
 char string[200][1024] = { '\0' };
 
 enum opCode {
-	PUSH = 36, RET, CALL, BNZ, BZ,DEVIATION,//数组偏移
-	READ,WRITE,ASS,FUNC
+	PUSH = 36, RET, CALL, BNEZ,//不等于0
+	DEVIATION,//数组偏移
+	READ,WRITE,ASS,FUNC,
+	LABEL,
+	GOTO//无条件跳转
 };
 
 struct mid { // z = x op y
@@ -135,6 +138,9 @@ char nnn[1] = { '\0' };
 //var
 int var_index = 7;
 
+//condition
+int condition_index = -1;
+
 //word
 void readWord();
 
@@ -171,7 +177,7 @@ void backVarIndex() {
 }
 
 char* getVarIndex() {
-	char c[1024] = "\$";
+	char c[1024] = "$";
 	char s[1024] = "\0";
 	var_index++;
 	sprintf(s, "%d", var_index);

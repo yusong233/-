@@ -1,13 +1,20 @@
 const int _begini = 0, _endi = +18, testfg = -6;
-int num;
+
 void main(){
- int a, i;
+	int a, i;
+	int num;
+	num = 1;
+	if(num){
+		num = num + 10;
+		if(num <_endi){
+			printf("this is if2 true branch");
+		}else{
+			printf("this is if2 false branch");
+		}
+	}else{
+		num = num -1;
+		printf("from");
+	}
 
- num = 17;
-printf("_begini = ", _begini);
-printf("from");
-printf("testfg = ",testfg);
-printf(num);
-scanf(a,i);
-
+	printf(num);
 }

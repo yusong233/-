@@ -175,7 +175,7 @@ int relationOp() {
 int unsignedInteger() {
 	struct word* nowWord = getSym();
 	if (nowWord->type == INTCON) {
-		if (strcmp(id_name,"'\0'") != 0) {
+		if (strcmp(id_name, "'\0'") != 0) {
 			id_value = atoi(nowWord->string);
 		}
 		return TRUE;
@@ -857,7 +857,7 @@ int expre() {
 		if (now->type == MINU) {
 			add = 1;
 			mid->op = MINU;
-			strcpy(mid->x, "0");
+			strcpy(mid->x, "$zero");
 		}
 		judge = FALSE;
 	}
@@ -966,7 +966,7 @@ int writeState() {
 				strcpy(mid->x, s);
 				text_index++;
 				mid->op = WRITE;
-				
+
 				if ((did = getSym())->type == COMMA) {
 					if (expre() == TRUE) {
 						if ((did = getSym())->type == RPARENT) {
@@ -989,7 +989,7 @@ int writeState() {
 				}
 				mid_now->next = mid;
 				mid_now = mid;
-				
+
 			}
 			else {
 				back();
@@ -1159,17 +1159,31 @@ int assignState() {
 }
 
 //<条件>
-int condition() {
+int condition() { //<表达式><条件判断符><表达式>
 	int type1, type2;
+	struct mid* mid1, * mid2;
 	if (expre() == TRUE) {
+		mid1 = mid_now;
 		type1 = nowExpre;
+		condition_index++;
 		if (relationOp() == TRUE) {
+			back();
+			struct word* op = getSym();
 			if (expre() == TRUE) {
+				mid2 = mid_now;
 				type2 = nowExpre;
 				if (type1 == CHAR || type2 == CHAR || type1 != type2) {
 					back();
 					error(getSym(), f);//条件判断中出现不合法的类型，两个表达式类型必须相同且为整型
 				}
+				struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+				initialMid(mid);
+				mid->op = op->type;
+				strcpy(mid->x, mid1->z);
+				strcpy(mid->y, mid2->z);
+				sprintf(mid->z, "condition_%d", condition_index);
+				mid_now->next = mid;
+				mid_now = mid;
 				return TRUE;
 			}
 			else {
@@ -1183,6 +1197,13 @@ int condition() {
 				back();
 				error(getSym(), f);//条件判断中出现不合法的类型，条件中如果是单个表达式必须是整型
 			}
+			struct mid* mid = (struct mid*)malloc(sizeof(struct mid));
+			initialMid(mid);
+			mid->op = BNEZ;
+			strcpy(mid->x, mid1->z);
+			sprintf(mid->z, "condition_%d", condition_index);
+			mid_now->next = mid;
+			mid_now = mid;
 			return TRUE;
 		}
 	}
@@ -1199,13 +1220,44 @@ int conditionState() {
 	struct word* now = getSym();
 	struct word* did, * did1;
 	int flag = FALSE;
+	int if_index;
 	if (now->type == IFTK) {
 		if ((did = getSym())->type == LPARENT) {
 			if (condition() == TRUE) {
+				if_index = condition_index;
 				if ((did1 = getSym())->type == RPARENT) {
+					struct mid* begin = mid_now;
+					//label
+					struct mid* be0 = (struct mid*)malloc(sizeof(struct mid));
+					initialMid(be0);
+					be0->op = LABEL;
+					sprintf(be0->x, "if_%d:", if_index);
+					mid_now->next = be0;
+					mid_now = be0;
+					
 					if (state() == TRUE) {
+						struct mid* be = (struct mid*)malloc(sizeof(struct mid));
+						initialMid(be);
+						be->op = LABEL;
+						sprintf(be->x, "next_%d:", if_index);
+						mid_now->next = be;
+						mid_now = be;
+
+						struct mid* end = mid_now;
+						
 						if ((did = getSym())->type == ELSETK) {
+							mid_now = begin;
 							if (state() == TRUE) {
+
+								struct mid* fin = (struct mid*)malloc(sizeof(struct mid));
+								initialMid(fin);
+								fin->op = GOTO;
+								sprintf(fin->x, "next_%d", if_index);
+								mid_now->next = fin;
+								mid_now = fin;
+
+								mid_now->next = be0;
+								mid_now = end;
 								flag = TRUE;
 							}
 							else {
@@ -2257,7 +2309,7 @@ void funcMake() {
 		switch (symbol->type) {
 		case INT:
 			symbol->address = sp;
-			sp = sp - 4; 
+			sp = sp - 4;
 			break;
 		case CHAR:
 			symbol->address = sp;
@@ -2334,7 +2386,7 @@ struct symbol* findFunc(struct func* func, struct mid* mid, int i) {
 		break;
 	default: break;
 	}
-	while (p!= NULL) {
+	while (p != NULL) {
 		if (strcmp(s, p->name) == 0) {
 			return p;
 		}
@@ -2352,12 +2404,12 @@ void stateMake(struct mid* mid, struct func* func) {
 				fprintf(fp2, "lw %s, %s\n", mid->z, sym->name);
 			}
 			else if ((sym = findFunc(func, mid, 1)) != NULL) {
-				fprintf(fp2, "lw %s, %d\n", mid->z,sym->address);
+				fprintf(fp2, "lw %s, %d\n", mid->z, sym->address);
 			}
 			else {
 				fprintf(fp2, "li %s,%s\n", mid->z, mid->x);
 			}
-			
+
 		}
 		else {//#iden = #8;
 			if ((sym = findWhole(mid, 3)) != NULL) {
@@ -2402,7 +2454,7 @@ void stateMake(struct mid* mid, struct func* func) {
 		}
 		break;
 	case WRITE:
-		
+
 		if (mid->x[0] == '$') {
 			fprintf(fp2, "li $v0,1\n");
 			fprintf(fp2, "move $a0,%s\n", mid->x);
@@ -2432,7 +2484,35 @@ void stateMake(struct mid* mid, struct func* func) {
 			}
 		}
 		break;
-	default: break;
+	case LSS://小于blt
+		fprintf(fp2, "blt %s,%s,%s\n", mid->x, mid->y, mid->z);
+		break;
+	case LEQ://小于等于ble
+		fprintf(fp2, "ble %s,%s,%s\n", mid->x, mid->y, mid->z);
+		break;
+	case GRE://大于bgt
+		fprintf(fp2, "bgt %s,%s,%s\n", mid->x, mid->y, mid->z);
+		break;
+	case GEQ://大于等于bge
+		fprintf(fp2, "bge %s,%s,%s\n", mid->x, mid->y, mid->z);
+		break;
+	case EQL://等于beq
+		fprintf(fp2, "beq %s,%s,%s\n", mid->x, mid->y, mid->z);
+		break;
+	case NEQ://不等于bne
+		fprintf(fp2, "bne %s,%s,%s\n", mid->x, mid->y, mid->z);
+		break;
+	case BNEZ:
+		fprintf(fp2, "bnez %s,%s\n", mid->x,mid->z);
+		break;
+	case LABEL:
+		fprintf(fp2, "%s\n", mid->x);
+		break;
+	case GOTO:
+		fprintf(fp2, "j %s\n", mid->x);
+		break;
+	default:
+		break;
 	}
 
 }
@@ -2462,7 +2542,7 @@ int main() {
 	midCode = midCode->next;
 	printTable();
 	finalCode();
-	
+
 	fclose(fp1);
 	fclose(fp2);
 
