@@ -1,0 +1,53 @@
+.data
+_begini: .word 0
+_endi: .word 18
+testfg: .word -6
+num: .space 4
+string0 : .asciiz "_begini = "
+string1 : .asciiz "from"
+string2 : .asciiz "testfg = "
+huanhang : .asciiz "\n"
+.text
+j main
+main:
+li $8,17
+sw $8, num
+lw $8, _begini
+li $v0,4
+la $a0,string0
+syscall
+li $v0,1
+move $a0,$8
+syscall
+li $v0,4
+la $a0,huanhang
+syscall
+li $v0,4
+la $a0,string1
+syscall
+li $v0,4
+la $a0,huanhang
+syscall
+lw $9, testfg
+li $v0,4
+la $a0,string2
+syscall
+li $v0,1
+move $a0,$9
+syscall
+li $v0,4
+la $a0,huanhang
+syscall
+lw $10, num
+li $v0,1
+move $a0,$10
+syscall
+li $v0,4
+la $a0,huanhang
+syscall
+li $v0,5
+syscall
+sw $v0, 2147479548
+li $v0,5
+syscall
+sw $v0, 2147479544
